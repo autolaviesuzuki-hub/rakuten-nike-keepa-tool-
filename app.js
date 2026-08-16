@@ -2,7 +2,7 @@ const APPLICATION_ID = "a38ecc5b-5a90-4eb9-b4f8-e714ba84eefd";
 const ACCESS_KEY = "pk_oRPj9UEOAjvjnUtRwKwaje85mgY98Nzo7rzvGf7sQRj";
 const BASE_URL = "https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260701";
 
-// ★ Keepa API Key（本当はバックエンドに隠したいが、ここではフロント想定）
+// TODO: 自分の Keepa API Key に差し替え
 const KEEPA_API_KEY = "YOUR_KEEPA_KEY";
 
 const statusEl = document.getElementById("status");
@@ -13,33 +13,26 @@ document.getElementById("start").addEventListener("click", async () => {
 
   const allItems = [];
 
-  // 200ページ × 10件 = 2000件
   for (let page = 1; page <= 200; page++) {
     statusEl.textContent = `楽天API取得中… ページ ${page} / 200`;
 
     const items = await fetchRakutenPage("NIKE ナイキ", 10, page);
     if (!items) continue;
 
-    // Items をパースして一旦保持
     const parsed = parseItems(items);
     allItems.push(...parsed);
 
-    // 速度重視しつつも API 負荷を抑えるため、少しだけ待つ
-    await sleep(200); // 0.2秒
+    await sleep(200);
   }
 
   statusEl.textContent = `楽天取得完了。${allItems.length}件。Keepa 照合を開始します…`;
 
-  // ASIN 推定（ここは I のロジックで型番→ASIN を紐付ける想定）
-  // ここではダミーで item.url から ASIN を抜く関数を置いておく
   for (const item of allItems) {
-    item.asin = extractAsinFromUrl(item.url); // 実装は後述
+    item.asin = extractAsinFromUrl(item.url);
   }
 
-  // Keepa 照合（速度重視なのでまとめてリクエストする形が理想）
   const withKeepa = await attachKeepaData(allItems);
 
-  // テーブルに描画
   renderTable(withKeepa);
 
   statusEl.textContent = "全処理完了。Excel 出力ボタンからダウンロードできます。";
@@ -93,9 +86,7 @@ function parseItems(items) {
   return parsed;
 }
 
-// ダミー：URLからASINを抜く（実際は I の Keepa連携ロジックに合わせて）
 function extractAsinFromUrl(url) {
-  // 例: https://www.amazon.co.jp/dp/ASIN/...
   const m = url.match(/\/dp\/([A-Z0-9]{10})/);
   return m ? m[1] : null;
 }
@@ -114,7 +105,6 @@ async function attachKeepaData(items) {
 
     result.push({ ...item, keepaLowest: lowest });
 
-    // Keepa側のレート制限も考慮して少し待つ
     await sleep(300);
   }
 
@@ -122,7 +112,6 @@ async function attachKeepaData(items) {
 }
 
 async function fetchKeepa(asin) {
-  // Keepa Product Query API の例
   const url = `https://api.keepa.com/product?key=${KEEPA_API_KEY}&domain=JP&asin=${asin}`;
   const res = await fetch(url);
   const data = await res.json();
@@ -130,7 +119,6 @@ async function fetchKeepa(asin) {
   if (!data.products || !data.products.length) return null;
 
   const product = data.products[0];
-  // ここは I の好みでロジック調整可能
   return {
     lowestPrice: product.stats ? product.stats.minPrice : null
   };
