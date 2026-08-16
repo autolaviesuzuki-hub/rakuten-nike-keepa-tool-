@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>NIKE 楽天 × Keepa リサーチツール</title>
+</head>
+<body>
+  <h1>NIKE 楽天 × Keepa リサーチツール</h1>
+
+  <button id="start">ナイキ 200ページ × 10件 を取得開始</button>
+  <div id="status"></div>
+  <table id="result-table" border="1">
+    <thead>
+      <tr>
+        <th>商品名</th>
+        <th>楽天価格</th>
+        <th>ショップ名</th>
+        <th>商品URL</th>
+        <th>ASIN</th>
+        <th>Keepa最安</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <button id="export">Excel に出力</button>
+
+  <script src="libs/xlsx.full.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
