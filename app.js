@@ -9,14 +9,21 @@ const statusEl = document.getElementById("status");
 const tbodyEl = document.querySelector("#result-table tbody");
 
 document.getElementById("start").addEventListener("click", async () => {
-  statusEl.textContent = "楽天APIでナイキ検索を開始します…";
+  const keyword = document.getElementById("keyword").value.trim();
+
+  if (!keyword) {
+    alert("検索ワードを入力してください");
+    return;
+  }
+
+  statusEl.textContent = `${keyword} の楽天検索を開始します…`;
 
   const allItems = [];
 
   for (let page = 1; page <= 200; page++) {
     statusEl.textContent = `楽天API取得中… ページ ${page} / 200`;
 
-    const items = await fetchRakutenPage("NIKE ナイキ", 10, page);
+    const items = await fetchRakutenPage(keyword, 10, page);
     if (!items) continue;
 
     const parsed = parseItems(items);
@@ -25,7 +32,7 @@ document.getElementById("start").addEventListener("click", async () => {
     await sleep(200);
   }
 
-  statusEl.textContent = `楽天取得完了。${allItems.length}件。Keepa 照合を開始します…`;
+  statusEl.textContent = `楽天取得完了。${allItems.length}件。Keepa照合を開始します…`;
 
   for (const item of allItems) {
     item.asin = extractAsinFromUrl(item.url);
@@ -37,6 +44,7 @@ document.getElementById("start").addEventListener("click", async () => {
 
   statusEl.textContent = "全処理完了。Excel 出力ボタンからダウンロードできます。";
 });
+
 
 document.getElementById("export").addEventListener("click", () => {
   exportToExcel();
