@@ -21,7 +21,7 @@ document.getElementById("start").addEventListener("click", async () => {
   const allItems = [];
 
   // ★ 200ページ × hits=30（最大件数）
-  for (let page = 1; page <= 200; page++) {
+  for (let page = 1; page <= 110; page++) {
     statusEl.textContent = `楽天API取得中… ページ ${page} / 200`;
 
     const items = await fetchRakutenPage(keyword, page);
@@ -66,7 +66,7 @@ async function fetchRakutenPage(keyword, page) {
     applicationId: APPLICATION_ID,
     accessKey: ACCESS_KEY,
     keyword,
-    hits: 10,            // ★ 最大件数
+    hits: 30,            // ★ 最大件数
     page,
     formatVersion: 1
   });
