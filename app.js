@@ -20,20 +20,23 @@ document.getElementById("start").addEventListener("click", async () => {
 
   const allItems = [];
 
+  // ★ 200ページ × hits=30（最大件数）
   for (let page = 1; page <= 200; page++) {
     statusEl.textContent = `楽天API取得中… ページ ${page} / 200`;
 
-    const items = await fetchRakutenPage(keyword, 10, page);
-    if (!items) continue;
+    const items = await fetchRakutenPage(keyword, page);
+    if (items) {
+      const parsed = parseItems(items);
+      allItems.push(...parsed);
+    }
 
-    const parsed = parseItems(items);
-    allItems.push(...parsed);
-
-    await sleep(200);
+    // ★ 1秒間に2.9回叩く → 345msウェイト
+    await sleep(345);
   }
 
   statusEl.textContent = `楽天取得完了。${allItems.length}件。Keepa照合を開始します…`;
 
+  // ASIN抽出（Amazonリンクがある場合のみ）
   for (const item of allItems) {
     item.asin = extractAsinFromUrl(item.url);
   }
@@ -54,28 +57,48 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function fetchRakutenPage(keyword, hits, page) {
+
+// ======================================================
+// 楽天API（429自動リトライ＋hits=30）
+// ======================================================
+async function fetchRakutenPage(keyword, page) {
   const params = new URLSearchParams({
     applicationId: APPLICATION_ID,
     accessKey: ACCESS_KEY,
     keyword,
-    hits,
+    hits: 30,            // ★ 最大件数
     page,
     formatVersion: 1
   });
 
-  const res = await fetch(`${BASE_URL}?${params.toString()}`);
-  const data = await res.json();
+  while (true) {
+    const res = await fetch(`${BASE_URL}?${params.toString()}`);
+    const data = await res.json();
 
-  if (data.errors) {
-    console.warn("Rakuten API Error:", data.errors);
+    // 403 → Allowed Website 設定が必要
+    if (data.errors) {
+      console.warn("Rakuten API Error:", data.errors);
+      return null;
+    }
+
+    // 429 → レートリミット → 1秒待って再試行
+    if (data.statusCode === 429) {
+      console.warn(`429: 再試行します (page=${page})`);
+      await sleep(1000);
+      continue;
+    }
+
+    // Items が返ったら成功
+    if (data.Items) return data.Items;
+
     return null;
   }
-
-  if (!data.Items) return null;
-  return data.Items;
 }
 
+
+// ======================================================
+// Items パース
+// ======================================================
 function parseItems(items) {
   const parsed = [];
 
@@ -94,11 +117,19 @@ function parseItems(items) {
   return parsed;
 }
 
+
+// ======================================================
+// URLからASIN抽出（Amazonリンクがある場合のみ）
+// ======================================================
 function extractAsinFromUrl(url) {
   const m = url.match(/\/dp\/([A-Z0-9]{10})/);
   return m ? m[1] : null;
 }
 
+
+// ======================================================
+// Keepaデータ付与
+// ======================================================
 async function attachKeepaData(items) {
   const result = [];
 
@@ -113,12 +144,17 @@ async function attachKeepaData(items) {
 
     result.push({ ...item, keepaLowest: lowest });
 
+    // Keepa側のレート制限対策
     await sleep(300);
   }
 
   return result;
 }
 
+
+// ======================================================
+// Keepa API
+// ======================================================
 async function fetchKeepa(asin) {
   const url = `https://api.keepa.com/product?key=${KEEPA_API_KEY}&domain=JP&asin=${asin}`;
   const res = await fetch(url);
@@ -132,6 +168,10 @@ async function fetchKeepa(asin) {
   };
 }
 
+
+// ======================================================
+// テーブル描画
+// ======================================================
 function renderTable(items) {
   tbodyEl.innerHTML = "";
 
@@ -151,9 +191,13 @@ function renderTable(items) {
   }
 }
 
+
+// ======================================================
+// Excel 出力
+// ======================================================
 function exportToExcel() {
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.table_to_sheet(document.getElementById("result-table"));
-  XLSX.utils.book_append_sheet(wb, ws, "NIKE_RAKUTEN_KEEPA");
-  XLSX.writeFile(wb, "nike_rakuten_keepa.xlsx");
+  XLSX.utils.book_append_sheet(wb, ws, "RAKUTEN_KEEPA");
+  XLSX.writeFile(wb, "rakuten_keepa.xlsx");
 }
