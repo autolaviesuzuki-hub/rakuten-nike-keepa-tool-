@@ -1,31 +1,20 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8">
-  <title>NIKE 楽天 × Keepa リサーチツール</title>
-</head>
-<body>
-  <h1>NIKE 楽天 × Keepa リサーチツール</h1>
+<input type="text" id="keyword" placeholder="検索ワードを入力（例：NIKE ナイキ）" style="width:300px; padding:5px;">
+<button id="start">200件 × 10ページ分を取得開始</button>
 
-  <button id="start">ナイキ 200ページ × 10件 を取得開始</button>
-  <div id="status"></div>
-  <table id="result-table" border="1">
-    <thead>
-      <tr>
-        <th>商品名</th>
-        <th>楽天価格</th>
-        <th>ショップ名</th>
-        <th>商品URL</th>
-        <th>ASIN</th>
-        <th>Keepa最安</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
+<div id="status"></div>
 
-  <button id="export">Excel に出力</button>
+<table id="result-table" border="1">
+  <thead>
+    <tr>
+      <th>商品名</th>
+      <th>楽天価格</th>
+      <th>ショップ名</th>
+      <th>商品URL</th>
+      <th>ASIN</th>
+      <th>Keepa最安</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
 
-  <script src="libs/xlsx.full.min.js"></script>
-  <script src="app.js"></script>
-</body>
-</html>
+<button id="export">Excel に出力</button>
