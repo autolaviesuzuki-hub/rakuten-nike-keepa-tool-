@@ -31,7 +31,7 @@ document.getElementById("start").addEventListener("click", async () => {
     }
 
     // ★ 1秒間に2.9回叩く → 345msウェイト
-    await sleep(700);
+    await sleep(1400);
   }
 
   statusEl.textContent = `楽天取得完了。${allItems.length}件。Keepa照合を開始します…`;
