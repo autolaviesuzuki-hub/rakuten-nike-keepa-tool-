@@ -1,20 +1,47 @@
-<input type="text" id="keyword" placeholder="検索ワードを入力（例：NIKE ナイキ）" style="width:300px; padding:5px;">
-<button id="start">200件 × 10ページ分を取得開始</button>
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>楽天 × Keepa リサーチツール</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
 
-<div id="status"></div>
+  <h1>楽天 × Keepa リサーチツール</h1>
 
-<table id="result-table" border="1">
-  <thead>
-    <tr>
-      <th>商品名</th>
-      <th>楽天価格</th>
-      <th>ショップ名</th>
-      <th>商品URL</th>
-      <th>ASIN</th>
-      <th>Keepa最安</th>
-    </tr>
-  </thead>
-  <tbody></tbody>
-</table>
+  <!-- 🔍 検索ワード入力欄 -->
+  <input
+    type="text"
+    id="keyword"
+    placeholder="検索ワードを入力（例：NIKE ナイキ）"
+    style="width:300px; padding:5px;"
+  >
+  <button id="start">200件 × 10ページ分を取得開始</button>
 
-<button id="export">Excel に出力</button>
+  <!-- 📡 ステータス表示 -->
+  <div id="status" style="margin-top:20px; font-weight:bold;"></div>
+
+  <!-- 📋 結果テーブル -->
+  <table id="result-table" border="1" style="margin-top:20px; width:100%; border-collapse:collapse;">
+    <thead>
+      <tr>
+        <th>商品名</th>
+        <th>楽天価格</th>
+        <th>ショップ名</th>
+        <th>商品URL</th>
+        <th>ASIN</th>
+        <th>Keepa最安</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <!-- 📤 Excel 出力 -->
+  <button id="export" style="margin-top:20px;">Excel に出力</button>
+
+  <!-- 📚 ライブラリ & スクリプト -->
+  <script src="libs/xlsx.full.min.js"></script>
+  <script src="app.js"></script>
+
+</body>
+</html>
