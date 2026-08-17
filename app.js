@@ -66,7 +66,7 @@ async function fetchRakutenPage(keyword, page) {
     applicationId: APPLICATION_ID,
     accessKey: ACCESS_KEY,
     keyword,
-    hits: 30,            // ★ 最大件数
+    hits: 20,            // ★ 最大件数
     page,
     formatVersion: 1
   });
