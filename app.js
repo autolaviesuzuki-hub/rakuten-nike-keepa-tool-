@@ -2,7 +2,7 @@ const APPLICATION_ID = "a38ecc5b-5a90-4eb9-b4f8-e714ba84eefd";
 const ACCESS_KEY = "pk_oRPj9UEOAjvjnUtRwKwaje85mgY98Nzo7rzvGf7sQRj";
 const BASE_URL = "https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260701";
 
-// TODO: 自分の Keepa API Key に差し替え
+// Keepa API（必要なら）
 const KEEPA_API_KEY = "YOUR_KEEPA_KEY";
 
 const statusEl = document.getElementById("status");
@@ -20,9 +20,9 @@ document.getElementById("start").addEventListener("click", async () => {
 
   const allItems = [];
 
-  // ★ 200ページ × hits=30（最大件数）
+  // ★ 110ページ × hits=30（最大件数）
   for (let page = 1; page <= 110; page++) {
-    statusEl.textContent = `楽天API取得中… ページ ${page} / 200`;
+    statusEl.textContent = `楽天API取得中… ページ ${page} / 110`;
 
     const items = await fetchRakutenPage(keyword, page);
     if (items) {
@@ -30,24 +30,35 @@ document.getElementById("start").addEventListener("click", async () => {
       allItems.push(...parsed);
     }
 
-    // ★ 1秒間に2.9回叩く → 345msウェイト
+    // ★ hit30 の最適ウェイト（1.4秒）
     await sleep(1400);
   }
 
-  statusEl.textContent = `楽天取得完了。${allItems.length}件。Keepa照合を開始します…`;
+  statusEl.textContent = `楽天取得完了。${allItems.length}件。Keepa CSV を読み込みます…`;
 
-  // ASIN抽出（Amazonリンクがある場合のみ）
-  for (const item of allItems) {
+  // ★ ローカル Keepa CSV 読み込み
+  const keepaMap = await loadKeepaCsvFromLocal();
+  if (!keepaMap) {
+    alert("Keepa CSV を選択してください");
+    return;
+  }
+
+  // ★ 型番一致フィルタ
+  const filteredItems = filterByKeepa(allItems, keepaMap);
+
+  statusEl.textContent = `型番一致 ${filteredItems.length}件。Keepa照合を開始します…`;
+
+  // ASIN抽出
+  for (const item of filteredItems) {
     item.asin = extractAsinFromUrl(item.url);
   }
 
-  const withKeepa = await attachKeepaData(allItems);
+  const withKeepa = await attachKeepaData(filteredItems);
 
   renderTable(withKeepa);
 
   statusEl.textContent = "全処理完了。Excel 出力ボタンからダウンロードできます。";
 });
-
 
 document.getElementById("export").addEventListener("click", () => {
   exportToExcel();
@@ -57,7 +68,7 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-
+//
 // ======================================================
 // 楽天API（429自動リトライ＋hits=30）
 // ======================================================
@@ -66,7 +77,7 @@ async function fetchRakutenPage(keyword, page) {
     applicationId: APPLICATION_ID,
     accessKey: ACCESS_KEY,
     keyword,
-    hits: 30,            // ★ 最大件数
+    hits: 30,
     page,
     formatVersion: 1
   });
@@ -75,27 +86,24 @@ async function fetchRakutenPage(keyword, page) {
     const res = await fetch(`${BASE_URL}?${params.toString()}`);
     const data = await res.json();
 
-    // 403 → Allowed Website 設定が必要
     if (data.errors) {
       console.warn("Rakuten API Error:", data.errors);
       return null;
     }
 
-    // 429 → レートリミット → 1秒待って再試行
     if (data.statusCode === 429) {
       console.warn(`429: 再試行します (page=${page})`);
       await sleep(1000);
       continue;
     }
 
-    // Items が返ったら成功
     if (data.Items) return data.Items;
 
     return null;
   }
 }
 
-
+//
 // ======================================================
 // Items パース
 // ======================================================
@@ -117,18 +125,61 @@ function parseItems(items) {
   return parsed;
 }
 
-
+//
 // ======================================================
-// URLからASIN抽出（Amazonリンクがある場合のみ）
+// URLからASIN抽出
 // ======================================================
 function extractAsinFromUrl(url) {
   const m = url.match(/\/dp\/([A-Z0-9]{10})/);
   return m ? m[1] : null;
 }
 
-
+//
 // ======================================================
-// Keepaデータ付与
+// Keepa CSV（ローカル）読み込み
+// ======================================================
+async function loadKeepaCsvFromLocal() {
+  const fileInput = document.getElementById("keepaCsv");
+  const file = fileInput.files[0];
+  if (!file) return null;
+
+  const text = await file.text();
+  const lines = text.split("\n");
+
+  const keepaMap = new Map();
+
+  for (const line of lines.slice(1)) {
+    const cols = line.split(",");
+    const partNumber = cols[1]?.trim(); // PartNumber
+    if (partNumber) keepaMap.set(partNumber, true);
+  }
+
+  return keepaMap;
+}
+
+//
+// ======================================================
+// 型番抽出（楽天商品名から）
+// ======================================================
+function extractModelFromName(name) {
+  const m = name.match(/[A-Z0-9]{6,}/);
+  return m ? m[0] : null;
+}
+
+//
+// ======================================================
+// Keepa CSV と照合して一致した商品だけ残す
+// ======================================================
+function filterByKeepa(items, keepaMap) {
+  return items.filter(item => {
+    const model = extractModelFromName(item.name);
+    return model && keepaMap.has(model);
+  });
+}
+
+//
+// ======================================================
+// Keepa API
 // ======================================================
 async function attachKeepaData(items) {
   const result = [];
@@ -144,17 +195,12 @@ async function attachKeepaData(items) {
 
     result.push({ ...item, keepaLowest: lowest });
 
-    // Keepa側のレート制限対策
     await sleep(300);
   }
 
   return result;
 }
 
-
-// ======================================================
-// Keepa API
-// ======================================================
 async function fetchKeepa(asin) {
   const url = `https://api.keepa.com/product?key=${KEEPA_API_KEY}&domain=JP&asin=${asin}`;
   const res = await fetch(url);
@@ -168,7 +214,7 @@ async function fetchKeepa(asin) {
   };
 }
 
-
+//
 // ======================================================
 // テーブル描画
 // ======================================================
@@ -191,7 +237,7 @@ function renderTable(items) {
   }
 }
 
-
+//
 // ======================================================
 // Excel 出力
 // ======================================================
