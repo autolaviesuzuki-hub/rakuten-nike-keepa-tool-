@@ -1,95 +1,299 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <title>楽天 × Keepa 照合ツール（完全統合版）</title>
+  <meta charset="UTF-8" />
+  <title>楽天 × Keepa 照合ツール（完全版）</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
 
+  <!-- 簡易スタイル（UI最適化） -->
   <style>
     body {
-      font-family: sans-serif;
-      margin: 20px;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f5f5f7;
+      color: #222;
     }
-    h1 {
-      margin-bottom: 20px;
+    header {
+      background: #111827;
+      color: #f9fafb;
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    header h1 {
+      font-size: 18px;
+      margin: 0;
+    }
+    header .subtitle {
+      font-size: 12px;
+      opacity: 0.8;
+    }
+    main {
+      padding: 16px 20px 32px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .panel {
+      background: #ffffff;
+      border-radius: 8px;
+      padding: 16px 18px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .panel h2 {
+      font-size: 15px;
+      margin: 0 0 8px;
+      border-left: 4px solid #2563eb;
+      padding-left: 8px;
+    }
+    .panel p {
+      font-size: 12px;
+      margin: 4px 0 10px;
+      color: #4b5563;
+    }
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .row label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #374151;
+      min-width: 120px;
+    }
+    input[type="file"],
+    input[type="text"] {
+      font-size: 12px;
     }
     input[type="text"] {
-      padding: 6px;
-      width: 300px;
-    }
-    #status {
-      margin-top: 20px;
-      font-weight: bold;
-      color: #333;
-    }
-    table {
-      margin-top: 20px;
-      width: 100%;
-      border-collapse: collapse;
-    }
-    table th, table td {
-      border: 1px solid #ccc;
-      padding: 6px;
-      font-size: 14px;
-    }
-    table th {
-      background: #f0f0f0;
+      padding: 6px 8px;
+      border-radius: 4px;
+      border: 1px solid #d1d5db;
+      min-width: 260px;
     }
     button {
-      padding: 8px 16px;
-      margin-left: 10px;
+      font-size: 12px;
+      padding: 6px 12px;
+      border-radius: 4px;
+      border: none;
       cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    button.primary {
+      background: #2563eb;
+      color: #ffffff;
+    }
+    button.secondary {
+      background: #e5e7eb;
+      color: #111827;
+    }
+    button.danger {
+      background: #ef4444;
+      color: #ffffff;
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+    .status {
+      font-size: 12px;
+      margin-top: 4px;
+      color: #374151;
+    }
+    .status span.ok {
+      color: #16a34a;
+      font-weight: 600;
+    }
+    .status span.ng {
+      color: #dc2626;
+      font-weight: 600;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+      font-size: 11px;
+    }
+    th, td {
+      border: 1px solid #e5e7eb;
+      padding: 4px 6px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #f3f4f6;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+    tbody tr:nth-child(even) {
+      background: #f9fafb;
+    }
+    .flex-between {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 999px;
+      font-size: 10px;
+      background: #e5e7eb;
+      color: #374151;
+    }
+    .badge.success {
+      background: #dcfce7;
+      color: #166534;
+    }
+    .badge.warn {
+      background: #fee2e2;
+      color: #b91c1c;
+    }
+    .log-area {
+      font-size: 11px;
+      background: #0b1120;
+      color: #e5e7eb;
+      padding: 8px 10px;
+      border-radius: 6px;
+      max-height: 160px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+    .log-area strong {
+      color: #93c5fd;
+    }
+    @media (max-width: 768px) {
+      header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+      }
+      .row label {
+        min-width: 90px;
+      }
+      input[type="text"] {
+        min-width: 180px;
+        width: 100%;
+      }
     }
   </style>
 </head>
-
 <body>
+  <header>
+    <div>
+      <h1>楽天 × Keepa 照合ツール</h1>
+      <div class="subtitle">型番照合・利益試算・Excelテンプレート出力（2026-08-版）</div>
+    </div>
+    <div>
+      <span class="badge">v1.0 完全版</span>
+    </div>
+  </header>
 
-  <h1>楽天 × Keepa 照合ツール（完全統合版）</h1>
+  <main>
+    <!-- ファイル入力パネル -->
+    <section class="panel">
+      <h2>入力ファイル</h2>
+      <p>楽天CSV（検索結果）と Keepa CSV（ASIN・PartNumber・価格・手数料）を読み込みます。PapaParseでブラウザ内解析します。</p>
 
-  <!-- Keepa CSV -->
-  <div>
-    <label>Keepa CSV（ローカル）:</label>
-    <input type="file" id="keepaCsv" accept=".csv">
-  </div>
+      <div class="row">
+        <label for="rakutenCsvInput">楽天CSV</label>
+        <input type="file" id="rakutenCsvInput" accept=".csv" />
+        <button class="secondary" id="clearRakutenBtn">クリア</button>
+      </div>
+      <div class="status" id="rakutenStatus">楽天CSV: 未読込</div>
 
-  <!-- 楽天検索 -->
-  <div style="margin-top: 10px;">
-    <label>検索ワード:</label>
-    <input type="text" id="keyword" placeholder="例：ナイキ シューズ">
-    <button id="start">楽天 × Keepa 照合開始</button>
-  </div>
+      <div class="row" style="margin-top:8px;">
+        <label for="keepaCsvInput">Keepa CSV</label>
+        <input type="file" id="keepaCsvInput" accept=".csv" />
+        <button class="secondary" id="clearKeepaBtn">クリア</button>
+      </div>
+      <div class="status" id="keepaStatus">Keepa CSV: 未読込</div>
 
-  <!-- ステータス -->
-  <div id="status"></div>
+      <div class="row" style="margin-top:12px;">
+        <label for="searchKeywordInput">検索ワード</label>
+        <input type="text" id="searchKeywordInput" placeholder="例: ナイキ シューズ" />
+        <button class="primary" id="runMatchBtn" disabled>楽天 × Keepa 照合開始</button>
+      </div>
+      <div class="status" id="matchStatus">照合待ち: 楽天CSVとKeepa CSVを読み込んでください。</div>
+    </section>
 
-  <!-- 結果テーブル -->
-  <table id="result-table">
-    <thead>
-      <tr>
-        <th>購入先（ショップ名）</th>
-        <th>商品名</th>
-        <th>商品名（型番）</th>
-        <th>楽天URL</th>
-        <th>単価</th>
+    <!-- 結果表示パネル -->
+    <section class="panel">
+      <h2>照合結果（型番一致一覧）</h2>
+      <p>楽天側「商品名」から型番を抽出し、Keepaの PartNumber と照合した結果を表示します。ASIN・出品価格・入金予定[円/個] を含みます。</p>
 
-        <th>ASIN</th>
-        <th>Amazon等販売先URL</th>
-        <th>出品価格</th>
-        <th>入金予定[円/個]</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
+      <div class="flex-between">
+        <div>
+          <span class="badge success" id="matchCountBadge">型番一致: 0件</span>
+        </div>
+        <div>
+          <button class="secondary" id="toggleRawBtn">生データ表示切替</button>
+        </div>
+      </div>
 
-  <!-- Excel 出力 -->
-  <button id="export" style="margin-top: 20px;">Excel 出力</button>
+      <div style="margin-top:8px; max-height:320px; overflow:auto;">
+        <table id="resultTable">
+          <thead>
+            <tr>
+              <th>購入先（ショップ名）</th>
+              <th>商品名</th>
+              <th>商品名（型番）</th>
+              <th>楽天URL</th>
+              <th>単価</th>
+              <th>ASIN</th>
+              <th>Amazon等販売先URL</th>
+              <th>出品価格</th>
+              <th>入金予定[円/個]</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- app.js で動的に行を追加 -->
+          </tbody>
+        </table>
+      </div>
+    </section>
 
-  <!-- ライブラリ -->
+    <!-- Excel出力パネル -->
+    <section class="panel">
+      <h2>Excelテンプレート出力</h2>
+      <p>
+        「楽天ポイント集計Excel」テンプレート形式で CSV を生成します。  
+        12行目以降に検索結果を流し込み、テンプレートの数式列はそのまま維持される構造で出力します。
+      </p>
+
+      <div class="row">
+        <label>Excel出力</label>
+        <button class="primary" id="exportExcelBtn" disabled>ExcelテンプレートCSVをダウンロード</button>
+        <button class="secondary" id="exportRawCsvBtn" disabled>結果のみCSVダウンロード</button>
+      </div>
+      <div class="status" id="exportStatus">Excel出力: 型番一致結果が生成されると有効になります。</div>
+    </section>
+
+    <!-- ログ・メッセージ -->
+    <section class="panel">
+      <h2>ログ / メッセージ</h2>
+      <p>処理の進行状況・エラー・抽出された型番などをテキストログとして確認できます。</p>
+      <div class="log-area" id="logArea">
+        <strong>楽天 × Keepa 照合ツール 起動</strong>
+        <br />楽天CSVとKeepa CSVを読み込み、検索ワードを指定して「照合開始」を押してください。
+      </div>
+    </section>
+  </main>
+
+  <!-- PapaParse（CDN） -->
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-  <script src="libs/xlsx.full.min.js"></script>
 
-  <!-- app.js -->
+  <!-- アプリ本体 -->
   <script src="app.js"></script>
-
 </body>
 </html>
