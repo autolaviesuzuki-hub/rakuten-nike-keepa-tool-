@@ -1,5 +1,6 @@
 // =========================================================
 // app.js（楽天API自動取得 → Keepa照合 → ExcelテンプレCSV出力）
+// config.js の値を自動参照する完全版
 // =========================================================
 
 // ---- グローバル状態 ----
@@ -174,10 +175,12 @@ async function fetchRakutenPage(keyword, page, hits, appId, affiliateId) {
 }
 
 async function runRakutenApi() {
-  const appId = rakutenAppIdInput.value.trim();
-  const affiliateId = rakutenAffiliateIdInput.value.trim();
-  const hits = Number(rakutenHitsInput.value);
-  const maxPage = Number(rakutenMaxPageInput.value);
+  // ★★★ ここが config.js を参照する部分 ★★★
+  const appId = rakutenAppIdInput.value.trim() || CONFIG.RAKUTEN_APP_ID;
+  const affiliateId = rakutenAffiliateIdInput.value.trim() || CONFIG.RAKUTEN_AFFILIATE_ID;
+
+  const hits = Number(rakutenHitsInput.value) || CONFIG.DEFAULT_HITS;
+  const maxPage = Number(rakutenMaxPageInput.value) || CONFIG.DEFAULT_MAX_PAGE;
   const keyword = searchKeywordInput.value.trim();
 
   if (!appId) {
@@ -446,32 +449,4 @@ runRakutenApiBtn.addEventListener("click", runRakutenApi);
 
 keepaCsvInput.addEventListener("change", async (e) => {
   const file = e.target.files[0];
-  if (!file) return;
-  setStatus(keepaStatus, "Keepa CSV読込中…");
-  try {
-    await loadKeepaCsv(file);
-    setStatus(keepaStatus, `Keepa CSV読込完了（${keepaRows.length}件）`);
-    log(`Keepa CSV読込完了 rows=${keepaRows.length}`);
-  } catch (err) {
-    setStatus(keepaStatus, "Keepa CSV読込エラー");
-    log("Keepa CSV読込エラー");
-  }
-  updateButtons();
-});
-
-clearKeepaBtn.addEventListener("click", () => {
-  keepaRows = [];
-  keepaHeader = [];
-  keepaByPart.clear();
-  setStatus(keepaStatus, "Keepa CSV: 未読込");
-  log("Keepa CSVクリア");
-  updateButtons();
-});
-
-runMatchBtn.addEventListener("click", runMatching);
-exportExcelBtn.addEventListener("click", exportExcelTemplateCsv);
-exportRawCsvBtn.addEventListener("click", exportRawCsv);
-
-// ---- 初期化 ----
-log("app.js 初期化完了");
-updateButtons();
+  if
