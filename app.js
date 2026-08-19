@@ -155,6 +155,7 @@ async function fetchRakutenPage(keyword, page, hits, appId, affiliateId) {
 
   const params = {
     applicationId: appId,
+    accessKey: accessKey,
     affiliateId: affiliateId || "",
     keyword,
     hits,
