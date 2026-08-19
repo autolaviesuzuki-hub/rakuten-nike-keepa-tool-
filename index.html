@@ -156,39 +156,50 @@
   <main>
     <!-- 楽天API設定 -->
     <section>
-      <h2>楽天API設定</h2>
-      <div class="row">
-        <div class="col-4">
-          <label for="rakutenAppId">楽天アプリID（Application ID）</label>
-          <input type="text" id="rakutenAppId" value="a38ecc5b-5a90-4eb9-b4f8-e714ba84eefd" placeholder="例: 1234567890abcdef1234567890abcdef"/>
-        </div>
-        <div class="col-4">
-          <label for="rakutenAffiliateId">楽天アフィリエイトID（任意）</label>
-          <input type="text" id="rakutenAffiliateId" placeholder="例: 12345678.abcdef12.12345678.abcdef12" />
-        </div>
-        <div class="col-4">
-          <label for="rakutenHits">1ページあたりの件数（hits）</label>
-          <input type="number" id="rakutenHits" value="30" min="1" max="30" />
-        </div>
-      </div>
-      <div class="row">
-        <div class="col-4">
-          <label for="rakutenMaxPage">最大ページ数</label>
-          <input type="number" id="rakutenMaxPage" value="100" min="1" max="100" />
-        </div>
-        <div class="col-4">
-          <label for="searchKeywordInput">検索キーワード</label>
-          <input type="text" id="searchKeywordInput" placeholder="例: ナイキ シューズ" />
-        </div>
-        <div class="col-4">
-          <label>&nbsp;</label><br />
-          <button id="runRakutenApiBtn" class="primary">楽天APIで検索実行</button>
-        </div>
-      </div>
-      <p style="font-size:12px; color:#555;">
-        楽天APIで <strong>hits × maxPage</strong> 件（例: 30 × 100 = 3000件）を取得し、内部で「楽天CSV」として保持します。
-      </p>
-    </section>
+  <h2>楽天API設定</h2>
+  <div class="row">
+    <div class="col-4">
+      <label for="rakutenAppId">楽天アプリID（Application ID）</label>
+      <input type="text" id="rakutenAppId" value="a38ecc5b-5a90-4eb9-b4f8-e714ba84eefd" placeholder="例: 1234567890abcdef1234567890abcdef"/>
+    </div>
+
+    <div class="col-4">
+      <label for="rakutenAccessKey">楽天AccessKey</label>
+      <input type="text" id="rakutenAccessKey" value="pk_oRPj9UEOAjvjnUtRwKwaje85mgY98Nzo7rzvGf7sQRj" placeholder="例: pk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxx" />
+    </div>
+
+    <div class="col-4">
+      <label for="rakutenAffiliateId">楽天アフィリエイトID（任意）</label>
+      <input type="text" id="rakutenAffiliateId" value="508e3cc0.8bca5b62.508e3cc1.e4f6afac" placeholder="例: 12345678.abcdef12.12345678.abcdef12" />
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-4">
+      <label for="rakutenHits">1ページあたりの件数（hits）</label>
+      <input type="number" id="rakutenHits" value="30" min="1" max="30" />
+    </div>
+    <div class="col-4">
+      <label for="rakutenMaxPage">最大ページ数</label>
+      <input type="number" id="rakutenMaxPage" value="100" min="1" max="100" />
+    </div>
+    <div class="col-4">
+      <label for="searchKeywordInput">検索キーワード</label>
+      <input type="text" id="searchKeywordInput" placeholder="例: ナイキ シューズ" />
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-4">
+      <label>&nbsp;</label><br />
+      <button id="runRakutenApiBtn" class="primary">楽天APIで検索実行</button>
+    </div>
+  </div>
+
+  <p style="font-size:12px; color:#555;">
+    楽天APIで <strong>hits × maxPage</strong> 件（例: 30 × 100 = 3000件）を取得し、内部で「楽天CSV」として保持します。
+  </p>
+</section>
 
     <!-- Keepa CSV入力 -->
     <section>
