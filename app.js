@@ -151,9 +151,9 @@ function getKeepaPriceInfo(row) {
 async function fetchRakutenPage(keyword, page, hits, appId, accessKey, affiliateId) {
   const url = "https://app.rakuten.co.jp/services/api/IchibaItem/Search/20260701";
 
-  const params = {
+  const body = {
     applicationId: appId,
-    accessKey: accessKey,      // ← 2026年版 API で必須
+    accessKey: accessKey,
     affiliateId: affiliateId || "",
     keyword,
     hits,
@@ -162,7 +162,7 @@ async function fetchRakutenPage(keyword, page, hits, appId, accessKey, affiliate
   };
 
   try {
-    const res = await axios.get(url, { params });
+    const res = await axios.post(url, body);
     if (res.data && res.data.Items) {
       return res.data.Items;
     }
@@ -172,6 +172,7 @@ async function fetchRakutenPage(keyword, page, hits, appId, accessKey, affiliate
     return [];
   }
 }
+
 
 async function runRakutenApi() {
   const appId = rakutenAppIdInput.value.trim();
