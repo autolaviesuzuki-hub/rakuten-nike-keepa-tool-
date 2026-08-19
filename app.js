@@ -43,7 +43,7 @@ document.getElementById("start").addEventListener("click", async () => {
     return;
   }
 
-  // ★ 型番一致フィルタ
+  // ★ 型番曖昧照合フィルタ
   const filteredItems = filterByKeepa(allItems, keepaMap);
 
   statusEl.textContent = `型番一致 ${filteredItems.length}件。Keepa照合を開始します…`;
@@ -151,7 +151,7 @@ async function loadKeepaCsvFromLocal() {
   for (const line of lines.slice(1)) {
     const cols = line.split(",");
     const partNumber = cols[1]?.trim(); // PartNumber
-    if (partNumber) keepaMap.set(partNumber, true);
+    if (partNumber) keepaMap.set(partNumber.toUpperCase(), true);
   }
 
   return keepaMap;
@@ -159,11 +159,47 @@ async function loadKeepaCsvFromLocal() {
 
 //
 // ======================================================
-// 型番抽出（楽天商品名から）
+// レーベンシュタイン距離（曖昧一致）
 // ======================================================
-function extractModelFromName(name) {
-  const m = name.match(/[A-Z0-9]{6,}/);
-  return m ? m[0] : null;
+function levenshtein(a, b) {
+  const dp = Array.from({ length: a.length + 1 }, () => Array(b.length + 1).fill(0));
+  for (let i = 0; i <= a.length; i++) dp[i][0] = i;
+  for (let j = 0; j <= b.length; j++) dp[0][j] = j;
+
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      dp[i][j] = Math.min(
+        dp[i-1][j] + 1,
+        dp[i][j-1] + 1,
+        dp[i-1][j-1] + (a[i-1] === b[j-1] ? 0 : 1)
+      );
+    }
+  }
+  return dp[a.length][b.length];
+}
+
+//
+// ======================================================
+// 型番曖昧照合（完全一致 → ハイフン除去 → レーベン距離）
+// ======================================================
+function matchModelFromKeepa(name, keepaMap) {
+  const cleanName = name.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+
+  for (const partNumber of keepaMap.keys()) {
+    const pn = partNumber.toUpperCase();
+    const pnClean = pn.replace(/[^A-Za-z0-9]/g, "");
+
+    // ① 完全一致
+    if (name.toUpperCase().includes(pn)) return pn;
+
+    // ② ハイフン除去一致
+    if (cleanName.includes(pnClean)) return pn;
+
+    // ③ レーベンシュタイン距離（曖昧一致）
+    if (levenshtein(cleanName, pnClean) <= 2) return pn;
+  }
+
+  return null;
 }
 
 //
@@ -172,8 +208,12 @@ function extractModelFromName(name) {
 // ======================================================
 function filterByKeepa(items, keepaMap) {
   return items.filter(item => {
-    const model = extractModelFromName(item.name);
-    return model && keepaMap.has(model);
+    const matched = matchModelFromKeepa(item.name, keepaMap);
+    if (matched) {
+      item.model = matched; // 一致した型番を保存
+      return true;
+    }
+    return false;
   });
 }
 
@@ -229,6 +269,7 @@ function renderTable(items) {
       <td>${item.price}</td>
       <td>${item.shop}</td>
       <td><a href="${item.url}" target="_blank">リンク</a></td>
+      <td>${item.model || ""}</td>
       <td>${item.asin || ""}</td>
       <td>${item.keepaLowest || ""}</td>
     `;
