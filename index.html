@@ -1,28 +1,43 @@
-<div>
-  <label>Keepa CSV（ローカル）:</label>
-  <input type="file" id="keepaCsv" accept=".csv">
-</div>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>楽天 × Keepa 照合ツール</title>
+</head>
 
-<div>
-  <label>検索ワード:</label>
-  <input type="text" id="keyword">
-  <button id="start">楽天 × Keepa 照合開始</button>
-</div>
+<body>
 
-<div id="status"></div>
+  <div>
+    <label>Keepa CSV（ローカル）:</label>
+    <input type="file" id="keepaCsv" accept=".csv">
+  </div>
 
-<table id="result-table">
-  <thead>
-    <tr>
-      <th>商品名</th>
-      <th>楽天価格</th>
-      <th>ショップ名</th>
-      <th>商品URL</th>
-      <th>ASIN</th>
-      <th>Keepa最安値</th>
-    </tr>
-  </thead>
-  <tbody></tbody>
-</table>
+  <div>
+    <label>検索ワード:</label>
+    <input type="text" id="keyword">
+    <button id="start">楽天 × Keepa 照合開始</button>
+  </div>
 
-<button id="export">Excel 出力</button>
+  <div id="status"></div>
+
+  <table id="result-table">
+    <thead>
+      <tr>
+        <th>商品名</th>
+        <th>楽天価格</th>
+        <th>ショップ名</th>
+        <th>商品URL</th>
+        <th>ASIN</th>
+        <th>Keepa最安値</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <button id="export">Excel 出力</button>
+
+  <!-- ★★★ ここが最重要 ★★★ -->
+  <script src="app.js"></script>
+
+</body>
+</html>
