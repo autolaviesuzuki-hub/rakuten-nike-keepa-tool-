@@ -1,6 +1,6 @@
 // =========================================================
 // app.js（楽天API自動取得 → Keepa照合 → ExcelテンプレCSV出力）
-// config.js の値を自動参照する完全版
+// AccessKey 対応版（2026年版 API仕様）
 // =========================================================
 
 // ---- グローバル状態 ----
@@ -12,6 +12,7 @@ let resultRows = [];       // 照合結果
 
 // ---- DOM取得 ----
 const rakutenAppIdInput = document.getElementById("rakutenAppId");
+const rakutenAccessKeyInput = document.getElementById("rakutenAccessKey");
 const rakutenAffiliateIdInput = document.getElementById("rakutenAffiliateId");
 const rakutenHitsInput = document.getElementById("rakutenHits");
 const rakutenMaxPageInput = document.getElementById("rakutenMaxPage");
@@ -96,18 +97,15 @@ function extractModelCode(name) {
   if (!name) return "";
   const upper = name.toUpperCase();
 
-  // 1. Keepa PartNumber を含むか
   for (const part of keepaByPart.keys()) {
     const p = part.toUpperCase();
     if (upper.includes(p)) return part;
   }
 
-  // 2. 正規表現
   const regex = /[A-Z0-9]{2,}-\d{3}/g;
   const m = upper.match(regex);
   if (m && m.length) return m[0];
 
-  // 3. NIKE FB2207-005
   const regex2 = /NIKE\s+([A-Z0-9]{2,}-\d{3})/i;
   const m2 = name.match(regex2);
   if (m2 && m2[1]) return m2[1];
@@ -148,14 +146,14 @@ function getKeepaPriceInfo(row) {
 }
 
 // =========================================================
-// 楽天APIで商品取得
+// 楽天APIで商品取得（AccessKey対応版）
 // =========================================================
-async function fetchRakutenPage(keyword, page, hits, appId, affiliateId) {
+async function fetchRakutenPage(keyword, page, hits, appId, accessKey, affiliateId) {
   const url = "https://app.rakuten.co.jp/services/api/IchibaItem/Search/20260701";
 
   const params = {
     applicationId: appId,
-    accessKey: accessKey,
+    accessKey: accessKey,      // ← 2026年版 API で必須
     affiliateId: affiliateId || "",
     keyword,
     hits,
@@ -176,16 +174,19 @@ async function fetchRakutenPage(keyword, page, hits, appId, affiliateId) {
 }
 
 async function runRakutenApi() {
-  // ★★★ ここが config.js を参照する部分 ★★★
-  const appId = rakutenAppIdInput.value.trim() || CONFIG.RAKUTEN_APP_ID;
-  const affiliateId = rakutenAffiliateIdInput.value.trim() || CONFIG.RAKUTEN_AFFILIATE_ID;
-
-  const hits = Number(rakutenHitsInput.value) || CONFIG.DEFAULT_HITS;
-  const maxPage = Number(rakutenMaxPageInput.value) || CONFIG.DEFAULT_MAX_PAGE;
+  const appId = rakutenAppIdInput.value.trim();
+  const accessKey = rakutenAccessKeyInput.value.trim();
+  const affiliateId = rakutenAffiliateIdInput.value.trim();
+  const hits = Number(rakutenHitsInput.value);
+  const maxPage = Number(rakutenMaxPageInput.value);
   const keyword = searchKeywordInput.value.trim();
 
   if (!appId) {
     alert("楽天アプリIDを入力してください");
+    return;
+  }
+  if (!accessKey) {
+    alert("楽天AccessKeyを入力してください");
     return;
   }
   if (!keyword) {
@@ -199,7 +200,7 @@ async function runRakutenApi() {
 
   for (let page = 1; page <= maxPage; page++) {
     setStatus(rakutenStatus, `楽天API取得中… ${page}/${maxPage}`);
-    const items = await fetchRakutenPage(keyword, page, hits, appId, affiliateId);
+    const items = await fetchRakutenPage(keyword, page, hits, appId, accessKey, affiliateId);
 
     items.forEach((item) => {
       rakutenRows.push({
@@ -211,7 +212,7 @@ async function runRakutenApi() {
       });
     });
 
-    await new Promise((r) => setTimeout(r, 1200)); // API制限対策
+    await new Promise((r) => setTimeout(r, 1200));
   }
 
   setStatus(rakutenStatus, `楽天検索結果: ${rakutenRows.length}件`);
@@ -450,4 +451,26 @@ runRakutenApiBtn.addEventListener("click", runRakutenApi);
 
 keepaCsvInput.addEventListener("change", async (e) => {
   const file = e.target.files[0];
-  if
+  if (!file) return;
+  setStatus(keepaStatus, "Keepa CSV読込中…");
+  try {
+    await loadKeepaCsv(file);
+    setStatus(keepaStatus, `Keepa CSV読込完了（${keepaRows.length}件）`);
+    log(`Keepa CSV読込完了 rows=${keepaRows.length}`);
+  } catch (err) {
+    setStatus(keepaStatus, "Keepa CSV読込エラー");
+    log("Keepa CSV読込エラー");
+  }
+  updateButtons();
+});
+
+clearKeepaBtn.addEventListener("click", () => {
+  keepaRows = [];
+  keepaHeader = [];
+  keepaByPart.clear();
+  setStatus(keepaStatus, "Keepa CSV: 未読込");
+  log("Keepa CSVクリア");
+  updateButtons();
+});
+
+runMatchBtn.add
