@@ -16,7 +16,6 @@ document.getElementById("start").addEventListener("click", async () => {
 
   const allItems = [];
 
-  // 楽天API 110ページ × hits=30
   for (let page = 1; page <= 110; page++) {
     statusEl.textContent = `楽天API取得中… ページ ${page} / 110`;
 
@@ -102,7 +101,7 @@ function parseItems(items) {
 }
 
 //
-// Keepa CSV 読み込み
+// Keepa CSV 読み込み（PapaParse）
 //
 async function loadKeepaCsvFromLocal() {
   const fileInput = document.getElementById("keepaCsv");
@@ -110,25 +109,27 @@ async function loadKeepaCsvFromLocal() {
   if (!file) return null;
 
   const text = await file.text();
-  const lines = text.split("\n");
+
+  const parsed = Papa.parse(text, {
+    header: true,
+    skipEmptyLines: true
+  });
 
   const keepaList = [];
 
-  for (const line of lines.slice(1)) {
-    const cols = line.split(",");
-
-    const asin = cols[17]?.trim();
-    const part = cols[18]?.trim()?.toUpperCase();
-    const buybox = parseFloat(cols[5]);
-    const fbaMin = parseFloat(cols[7]);
-    const fbaFee = parseFloat(cols[9]);
-    const rate = parseFloat(cols[10]); // 手数料％
+  for (const row of parsed.data) {
+    const asin = row["ASIN"];
+    const part = row["商品コード: PartNumber"];
+    const buybox = parseFloat(row["Buy Box: 現在価格"]);
+    const fbaMin = parseFloat(row["新しい、第三者FBA: 現在価格"]);
+    const fbaFee = parseFloat(row["FBA Pick&Pack 料金"]);
+    const rate = parseFloat(row["紹介料％"]);
 
     if (!part) continue;
 
     keepaList.push({
       asin,
-      partNumber: part,
+      partNumber: part.toUpperCase(),
       price: buybox || fbaMin || null,
       fbaFee,
       rate
