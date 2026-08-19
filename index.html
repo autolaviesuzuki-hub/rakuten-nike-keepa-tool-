@@ -1,42 +1,95 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>楽天 × Keepa 照合ツール</title>
+  <title>楽天 × Keepa 照合ツール（完全統合版）</title>
+
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 20px;
+    }
+    h1 {
+      margin-bottom: 20px;
+    }
+    input[type="text"] {
+      padding: 6px;
+      width: 300px;
+    }
+    #status {
+      margin-top: 20px;
+      font-weight: bold;
+      color: #333;
+    }
+    table {
+      margin-top: 20px;
+      width: 100%;
+      border-collapse: collapse;
+    }
+    table th, table td {
+      border: 1px solid #ccc;
+      padding: 6px;
+      font-size: 14px;
+    }
+    table th {
+      background: #f0f0f0;
+    }
+    button {
+      padding: 8px 16px;
+      margin-left: 10px;
+      cursor: pointer;
+    }
+  </style>
 </head>
 
 <body>
 
+  <h1>楽天 × Keepa 照合ツール（完全統合版）</h1>
+
+  <!-- Keepa CSV -->
   <div>
     <label>Keepa CSV（ローカル）:</label>
     <input type="file" id="keepaCsv" accept=".csv">
   </div>
 
-  <div>
+  <!-- 楽天検索 -->
+  <div style="margin-top: 10px;">
     <label>検索ワード:</label>
-    <input type="text" id="keyword">
+    <input type="text" id="keyword" placeholder="例：ナイキ シューズ">
     <button id="start">楽天 × Keepa 照合開始</button>
   </div>
 
+  <!-- ステータス -->
   <div id="status"></div>
 
+  <!-- 結果テーブル -->
   <table id="result-table">
     <thead>
       <tr>
+        <!-- 楽天側（B〜F列） -->
+        <th>購入先（ショップ名）</th>
         <th>商品名</th>
-        <th>楽天価格</th>
-        <th>ショップ名</th>
-        <th>商品URL</th>
+        <th>商品名（型番）</th>
+        <th>楽天URL</th>
+        <th>単価</th>
+
+        <!-- Keepa側（CK〜CN列） -->
         <th>ASIN</th>
-        <th>Keepa最安値</th>
+        <th>Amazon等販売先URL</th>
+        <th>出品価格</th>
+        <th>入金予定[円/個]</th>
       </tr>
     </thead>
     <tbody></tbody>
   </table>
 
-  <button id="export">Excel 出力</button>
+  <!-- Excel 出力 -->
+  <button id="export" style="margin-top: 20px;">Excel 出力</button>
 
-  <!-- ★★★ ここが最重要 ★★★ -->
+  <!-- ライブラリ -->
+  <script src="libs/xlsx.full.min.js"></script>
+
+  <!-- app.js -->
   <script src="app.js"></script>
 
 </body>
