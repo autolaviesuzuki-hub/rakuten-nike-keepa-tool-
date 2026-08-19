@@ -2,15 +2,11 @@ const APPLICATION_ID = "a38ecc5b-5a90-4eb9-b4f8-e714ba84eefd";
 const ACCESS_KEY = "pk_oRPj9UEOAjvjnUtRwKwaje85mgY98Nzo7rzvGf7sQRj";
 const BASE_URL = "https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260701";
 
-// Keepa API（必要なら）
-const KEEPA_API_KEY = "YOUR_KEEPA_KEY";
-
 const statusEl = document.getElementById("status");
 const tbodyEl = document.querySelector("#result-table tbody");
 
 document.getElementById("start").addEventListener("click", async () => {
   const keyword = document.getElementById("keyword").value.trim();
-
   if (!keyword) {
     alert("検索ワードを入力してください");
     return;
@@ -20,7 +16,7 @@ document.getElementById("start").addEventListener("click", async () => {
 
   const allItems = [];
 
-  // ★ 110ページ × hits=30（最大件数）
+  // 楽天API 110ページ × hits=30
   for (let page = 1; page <= 110; page++) {
     statusEl.textContent = `楽天API取得中… ページ ${page} / 110`;
 
@@ -30,34 +26,22 @@ document.getElementById("start").addEventListener("click", async () => {
       allItems.push(...parsed);
     }
 
-    // ★ hit30 の最適ウェイト（1.4秒）
     await sleep(1400);
   }
 
   statusEl.textContent = `楽天取得完了。${allItems.length}件。Keepa CSV を読み込みます…`;
 
-  // ★ ローカル Keepa CSV 読み込み
-  const keepaMap = await loadKeepaCsvFromLocal();
-  if (!keepaMap) {
+  const keepaList = await loadKeepaCsvFromLocal();
+  if (!keepaList) {
     alert("Keepa CSV を選択してください");
     return;
   }
 
-  // ★ 型番曖昧照合フィルタ
-  const filteredItems = filterByKeepa(allItems, keepaMap);
+  const matchedItems = filterByKeepa(allItems, keepaList);
 
-  statusEl.textContent = `型番一致 ${filteredItems.length}件。Keepa照合を開始します…`;
+  statusEl.textContent = `型番一致 ${matchedItems.length}件。Excel 出力可能です。`;
 
-  // ASIN抽出
-  for (const item of filteredItems) {
-    item.asin = extractAsinFromUrl(item.url);
-  }
-
-  const withKeepa = await attachKeepaData(filteredItems);
-
-  renderTable(withKeepa);
-
-  statusEl.textContent = "全処理完了。Excel 出力ボタンからダウンロードできます。";
+  renderTable(matchedItems);
 });
 
 document.getElementById("export").addEventListener("click", () => {
@@ -69,9 +53,8 @@ function sleep(ms) {
 }
 
 //
-// ======================================================
-// 楽天API（429自動リトライ＋hits=30）
-// ======================================================
+// 楽天API
+//
 async function fetchRakutenPage(keyword, page) {
   const params = new URLSearchParams({
     applicationId: APPLICATION_ID,
@@ -86,13 +69,9 @@ async function fetchRakutenPage(keyword, page) {
     const res = await fetch(`${BASE_URL}?${params.toString()}`);
     const data = await res.json();
 
-    if (data.errors) {
-      console.warn("Rakuten API Error:", data.errors);
-      return null;
-    }
+    if (data.errors) return null;
 
     if (data.statusCode === 429) {
-      console.warn(`429: 再試行します (page=${page})`);
       await sleep(1000);
       continue;
     }
@@ -104,12 +83,10 @@ async function fetchRakutenPage(keyword, page) {
 }
 
 //
-// ======================================================
-// Items パース
-// ======================================================
+// 楽天 Items パース
+//
 function parseItems(items) {
   const parsed = [];
-
   for (const entry of items) {
     const item = entry.Item;
     if (!item) continue;
@@ -121,23 +98,12 @@ function parseItems(items) {
       shop: item.shopName
     });
   }
-
   return parsed;
 }
 
 //
-// ======================================================
-// URLからASIN抽出
-// ======================================================
-function extractAsinFromUrl(url) {
-  const m = url.match(/\/dp\/([A-Z0-9]{10})/);
-  return m ? m[1] : null;
-}
-
+// Keepa CSV 読み込み
 //
-// ======================================================
-// Keepa CSV（ローカル）読み込み
-// ======================================================
 async function loadKeepaCsvFromLocal() {
   const fileInput = document.getElementById("keepaCsv");
   const file = fileInput.files[0];
@@ -146,21 +112,35 @@ async function loadKeepaCsvFromLocal() {
   const text = await file.text();
   const lines = text.split("\n");
 
-  const keepaMap = new Map();
+  const keepaList = [];
 
   for (const line of lines.slice(1)) {
     const cols = line.split(",");
-    const partNumber = cols[1]?.trim(); // PartNumber
-    if (partNumber) keepaMap.set(partNumber.toUpperCase(), true);
+
+    const asin = cols[17]?.trim();
+    const part = cols[18]?.trim()?.toUpperCase();
+    const buybox = parseFloat(cols[5]);
+    const fbaMin = parseFloat(cols[7]);
+    const fbaFee = parseFloat(cols[9]);
+    const rate = parseFloat(cols[10]); // 手数料％
+
+    if (!part) continue;
+
+    keepaList.push({
+      asin,
+      partNumber: part,
+      price: buybox || fbaMin || null,
+      fbaFee,
+      rate
+    });
   }
 
-  return keepaMap;
+  return keepaList;
 }
 
 //
-// ======================================================
-// レーベンシュタイン距離（曖昧一致）
-// ======================================================
+// レーベンシュタイン距離
+//
 function levenshtein(a, b) {
   const dp = Array.from({ length: a.length + 1 }, () => Array(b.length + 1).fill(0));
   for (let i = 0; i <= a.length; i++) dp[i][0] = i;
@@ -179,85 +159,49 @@ function levenshtein(a, b) {
 }
 
 //
-// ======================================================
-// 型番曖昧照合（完全一致 → ハイフン除去 → レーベン距離）
-// ======================================================
-function matchModelFromKeepa(name, keepaMap) {
+// 型番曖昧照合
+//
+function matchKeepaModel(name, keepaList) {
   const cleanName = name.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
 
-  for (const partNumber of keepaMap.keys()) {
-    const pn = partNumber.toUpperCase();
+  for (const k of keepaList) {
+    const pn = k.partNumber;
     const pnClean = pn.replace(/[^A-Za-z0-9]/g, "");
 
-    // ① 完全一致
-    if (name.toUpperCase().includes(pn)) return pn;
-
-    // ② ハイフン除去一致
-    if (cleanName.includes(pnClean)) return pn;
-
-    // ③ レーベンシュタイン距離（曖昧一致）
-    if (levenshtein(cleanName, pnClean) <= 2) return pn;
+    if (name.toUpperCase().includes(pn)) return k;
+    if (cleanName.includes(pnClean)) return k;
+    if (levenshtein(cleanName, pnClean) <= 2) return k;
   }
 
   return null;
 }
 
 //
-// ======================================================
-// Keepa CSV と照合して一致した商品だけ残す
-// ======================================================
-function filterByKeepa(items, keepaMap) {
-  return items.filter(item => {
-    const matched = matchModelFromKeepa(item.name, keepaMap);
-    if (matched) {
-      item.model = matched; // 一致した型番を保存
-      return true;
-    }
-    return false;
-  });
+// 楽天 × Keepa 照合
+//
+function filterByKeepa(items, keepaList) {
+  return items.map(item => {
+    const matched = matchKeepaModel(item.name, keepaList);
+    if (!matched) return null;
+
+    const price = matched.price;
+    const income =
+      price - matched.fbaFee - (price * matched.rate);
+
+    return {
+      ...item,
+      model: matched.partNumber,
+      asin: matched.asin,
+      amazonUrl: `https://www.amazon.co.jp/dp/${matched.asin}`,
+      keepaPrice: price,
+      incomePerUnit: Math.round(income)
+    };
+  }).filter(Boolean);
 }
 
 //
-// ======================================================
-// Keepa API
-// ======================================================
-async function attachKeepaData(items) {
-  const result = [];
-
-  for (const item of items) {
-    if (!item.asin) {
-      result.push({ ...item, keepaLowest: null });
-      continue;
-    }
-
-    const keepaData = await fetchKeepa(item.asin);
-    const lowest = keepaData ? keepaData.lowestPrice : null;
-
-    result.push({ ...item, keepaLowest: lowest });
-
-    await sleep(300);
-  }
-
-  return result;
-}
-
-async function fetchKeepa(asin) {
-  const url = `https://api.keepa.com/product?key=${KEEPA_API_KEY}&domain=JP&asin=${asin}`;
-  const res = await fetch(url);
-  const data = await res.json();
-
-  if (!data.products || !data.products.length) return null;
-
-  const product = data.products[0];
-  return {
-    lowestPrice: product.stats ? product.stats.minPrice : null
-  };
-}
-
-//
-// ======================================================
 // テーブル描画
-// ======================================================
+//
 function renderTable(items) {
   tbodyEl.innerHTML = "";
 
@@ -265,13 +209,16 @@ function renderTable(items) {
     const tr = document.createElement("tr");
 
     tr.innerHTML = `
-      <td>${item.name}</td>
-      <td>${item.price}</td>
       <td>${item.shop}</td>
-      <td><a href="${item.url}" target="_blank">リンク</a></td>
-      <td>${item.model || ""}</td>
-      <td>${item.asin || ""}</td>
-      <td>${item.keepaLowest || ""}</td>
+      <td>${item.name}</td>
+      <td>${item.model}</td>
+      <td><a href="${item.url}" target="_blank">楽天</a></td>
+      <td>${item.price}</td>
+
+      <td>${item.asin}</td>
+      <td><a href="${item.amazonUrl}" target="_blank">Amazon</a></td>
+      <td>${item.keepaPrice}</td>
+      <td>${item.incomePerUnit}</td>
     `;
 
     tbodyEl.appendChild(tr);
@@ -279,9 +226,8 @@ function renderTable(items) {
 }
 
 //
-// ======================================================
 // Excel 出力
-// ======================================================
+//
 function exportToExcel() {
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.table_to_sheet(document.getElementById("result-table"));
