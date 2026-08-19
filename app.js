@@ -151,7 +151,7 @@ function getKeepaPriceInfo(row) {
 // 楽天APIで商品取得
 // =========================================================
 async function fetchRakutenPage(keyword, page, hits, appId, affiliateId) {
-  const url = "https://app.rakuten.co.jp/services/api/IchibaItem/Search/20220601";
+  const url = "https://app.rakuten.co.jp/services/api/IchibaItem/Search/20260701";
 
   const params = {
     applicationId: appId,
