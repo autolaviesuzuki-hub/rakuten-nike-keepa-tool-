@@ -1,477 +1,247 @@
 // =========================================================
-// app.js（楽天API自動取得 → Keepa照合 → ExcelテンプレCSV出力）
-// AccessKey 対応版（2026年版 API仕様）
+// app.js（openapi.rakuten.co.jp 版 / 高速・CORS不要）
 // =========================================================
 
-// ---- グローバル状態 ----
-let rakutenRows = [];      // 楽天APIで取得した商品一覧
-let keepaRows = [];        // Keepa CSVの生データ行
-let keepaHeader = [];      // Keepaヘッダー
-let keepaByPart = new Map(); // PartNumber → Keepa行配列
-let resultRows = [];       // 照合結果
+// ---- 楽天API設定 ----
+const APPLICATION_ID = "a38ecc5b-5a90-4eb9-b4f8-e714ba84eefd";
+const ACCESS_KEY = "pk_oRPj9UEOAjvjnUtRwKwaje85mgY98Nzo7rzvGf7sQRj";
+const BASE_URL = "https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260701";
 
-// ---- DOM取得 ----
-const rakutenAppIdInput = document.getElementById("rakutenAppId");
-const rakutenAccessKeyInput = document.getElementById("rakutenAccessKey");
-const rakutenAffiliateIdInput = document.getElementById("rakutenAffiliateId");
-const rakutenHitsInput = document.getElementById("rakutenHits");
-const rakutenMaxPageInput = document.getElementById("rakutenMaxPage");
-const searchKeywordInput = document.getElementById("searchKeywordInput");
+// ---- DOM ----
+const statusEl = document.getElementById("status");
+const tbodyEl = document.querySelector("#result-table tbody");
 
-const runRakutenApiBtn = document.getElementById("runRakutenApiBtn");
-const keepaCsvInput = document.getElementById("keepaCsvInput");
-const clearKeepaBtn = document.getElementById("clearKeepaBtn");
-
-const runMatchBtn = document.getElementById("runMatchBtn");
-const exportExcelBtn = document.getElementById("exportExcelBtn");
-const exportRawCsvBtn = document.getElementById("exportRawCsvBtn");
-
-const rakutenStatus = document.getElementById("rakutenStatus");
-const keepaStatus = document.getElementById("keepaStatus");
-const matchStatus = document.getElementById("matchStatus");
-const matchSummary = document.getElementById("matchSummary");
-
-const resultTableBody = document.querySelector("#resultTable tbody");
-const logArea = document.getElementById("logArea");
-
-// ---- ログ ----
-function log(msg) {
-  const t = new Date().toLocaleTimeString();
-  logArea.value += `[${t}] ${msg}\n`;
-  logArea.scrollTop = logArea.scrollHeight;
+// ---- スリープ ----
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// ---- ステータス ----
-function setStatus(el, msg) {
-  if (el) el.textContent = msg;
+// =========================================================
+// 楽天API（openapi / GET / CORS許可 / 高速）
+// =========================================================
+async function fetchRakutenPage(keyword, page) {
+  const params = new URLSearchParams({
+    applicationId: APPLICATION_ID,
+    accessKey: ACCESS_KEY,
+    keyword,
+    hits: 30,
+    page,
+    formatVersion: 1
+  });
+
+  while (true) {
+    const res = await fetch(`${BASE_URL}?${params.toString()}`);
+    const data = await res.json();
+
+    if (data.errors) return null;
+
+    if (data.statusCode === 429) {
+      await sleep(1000);
+      continue;
+    }
+
+    if (data.Items) return data.Items;
+
+    return null;
+  }
 }
 
-// ---- 数値変換 ----
-function sanitizeNumber(v) {
-  if (v === null || v === undefined) return NaN;
-  if (typeof v === "number") return v;
-  const s = String(v).replace(/,/g, "").trim();
-  const n = parseFloat(s);
-  return isNaN(n) ? NaN : n;
+// =========================================================
+// 楽天 Items パース
+// =========================================================
+function parseItems(items) {
+  const parsed = [];
+  for (const entry of items) {
+    const item = entry.Item;
+    if (!item) continue;
+
+    parsed.push({
+      name: item.itemName,
+      price: item.itemPrice,
+      url: item.itemUrl,
+      shop: item.shopName
+    });
+  }
+  return parsed;
 }
 
 // =========================================================
 // Keepa CSV 読み込み
 // =========================================================
-function loadKeepaCsv(file) {
-  return new Promise((resolve, reject) => {
-    Papa.parse(file, {
-      encoding: "UTF-8",
-      skipEmptyLines: true,
-      complete: (results) => {
-        if (!results || !results.data || results.data.length < 2) {
-          return reject(new Error("Keepa CSVの内容が不正です"));
-        }
-        keepaHeader = results.data[0];
-        keepaRows = results.data.slice(1);
-        buildKeepaIndex();
-        resolve();
-      },
-      error: (err) => reject(err),
+async function loadKeepaCsvFromLocal() {
+  const fileInput = document.getElementById("keepaCsv");
+  const file = fileInput.files[0];
+  if (!file) return null;
+
+  const text = await file.text();
+
+  const parsed = Papa.parse(text, {
+    header: true,
+    skipEmptyLines: true
+  });
+
+  const keepaList = [];
+
+  for (const row of parsed.data) {
+    const asin = row["ASIN"];
+    const part = row["商品コード: PartNumber"];
+    const buybox = parseFloat(row["Buy Box: 現在価格"]);
+    const fbaMin = parseFloat(row["新しい、第三者FBA: 現在価格"]);
+    const fbaFee = parseFloat(row["FBA Pick&Pack 料金"]);
+    const rate = parseFloat(row["紹介料％"]);
+
+    if (!part) continue;
+
+    keepaList.push({
+      asin,
+      partNumber: part.toUpperCase(),
+      price: buybox || fbaMin || null,
+      fbaFee,
+      rate
     });
-  });
-}
-
-function buildKeepaIndex() {
-  keepaByPart.clear();
-  const idxPart = keepaHeader.indexOf("商品コード: PartNumber");
-  if (idxPart === -1) return;
-
-  keepaRows.forEach((row) => {
-    const part = (row[idxPart] || "").trim();
-    if (!part) return;
-    if (!keepaByPart.has(part)) keepaByPart.set(part, []);
-    keepaByPart.get(part).push(row);
-  });
-}
-
-// =========================================================
-// 型番抽出
-// =========================================================
-function extractModelCode(name) {
-  if (!name) return "";
-  const upper = name.toUpperCase();
-
-  for (const part of keepaByPart.keys()) {
-    const p = part.toUpperCase();
-    if (upper.includes(p)) return part;
   }
 
-  const regex = /[A-Z0-9]{2,}-\d{3}/g;
-  const m = upper.match(regex);
-  if (m && m.length) return m[0];
-
-  const regex2 = /NIKE\s+([A-Z0-9]{2,}-\d{3})/i;
-  const m2 = name.match(regex2);
-  if (m2 && m2[1]) return m2[1];
-
-  return "";
+  return keepaList;
 }
 
 // =========================================================
-// Keepa価格情報
+// レーベンシュタイン距離
 // =========================================================
-function getKeepaPriceInfo(row) {
-  const idxASIN = keepaHeader.indexOf("ASIN");
-  const idxPart = keepaHeader.indexOf("商品コード: PartNumber");
-  const idxBuyBox = keepaHeader.indexOf("Buy Box: 現在価格");
-  const idxFbaLowest = keepaHeader.indexOf("新しい、第三者FBA: 現在価格");
-  const idxFbaFee = keepaHeader.indexOf("FBA Pick&Pack 料金");
-  const idxReferralPct = keepaHeader.indexOf("紹介料％");
+function levenshtein(a, b) {
+  const dp = Array.from({ length: a.length + 1 }, () => Array(b.length + 1).fill(0));
+  for (let i = 0; i <= a.length; i++) dp[i][0] = i;
+  for (let j = 0; j <= b.length; j++) dp[0][j] = j;
 
-  const asin = idxASIN !== -1 ? (row[idxASIN] || "").trim() : "";
-  const part = idxPart !== -1 ? (row[idxPart] || "").trim() : "";
-
-  const buyBox = sanitizeNumber(row[idxBuyBox]);
-  const fbaLowest = sanitizeNumber(row[idxFbaLowest]);
-  const fbaFee = sanitizeNumber(row[idxFbaFee]);
-  const referralPct = sanitizeNumber(row[idxReferralPct]);
-
-  let listingPrice = !isNaN(buyBox) && buyBox > 0 ? buyBox :
-                     (!isNaN(fbaLowest) && fbaLowest > 0 ? fbaLowest : NaN);
-
-  if (isNaN(listingPrice)) {
-    return { asin, part, listingPrice: NaN, netPerUnit: NaN };
-  }
-
-  const referralFee = !isNaN(referralPct) ? listingPrice * (referralPct / 100) : 0;
-  const netPerUnit = Math.round(listingPrice - referralFee - (fbaFee || 0));
-
-  return { asin, part, listingPrice, netPerUnit };
-}
-
-// =========================================================
-// 楽天APIで商品取得（AccessKey対応版）
-// =========================================================
-async function fetchRakutenPage(keyword, page, hits, appId, accessKey, affiliateId) {
-  const url = "https://app.rakuten.co.jp/services/api/IchibaItem/Search/20260701";
-
-  const body = {
-    applicationId: appId,
-    accessKey: accessKey,
-    affiliateId: affiliateId || "",
-    keyword,
-    hits,
-    page,
-    formatVersion: 2,
-  };
-
-  try {
-    const res = await axios.post(url, body);
-    if (res.data && res.data.Items) {
-      return res.data.Items;
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      dp[i][j] = Math.min(
+        dp[i-1][j] + 1,
+        dp[i][j-1] + 1,
+        dp[i-1][j-1] + (a[i-1] === b[j-1] ? 0 : 1)
+      );
     }
-    return [];
-  } catch (err) {
-    log(`楽天APIエラー page=${page}`);
-    return [];
   }
-}
-
-
-async function runRakutenApi() {
-  const appId = rakutenAppIdInput.value.trim();
-  const accessKey = rakutenAccessKeyInput.value.trim();
-  const affiliateId = rakutenAffiliateIdInput.value.trim();
-  const hits = Number(rakutenHitsInput.value);
-  const maxPage = Number(rakutenMaxPageInput.value);
-  const keyword = searchKeywordInput.value.trim();
-
-  if (!appId) {
-    alert("楽天アプリIDを入力してください");
-    return;
-  }
-  if (!accessKey) {
-    alert("楽天AccessKeyを入力してください");
-    return;
-  }
-  if (!keyword) {
-    alert("検索キーワードを入力してください");
-    return;
-  }
-
-  rakutenRows = [];
-  setStatus(rakutenStatus, "楽天API取得中…");
-  log(`楽天API開始 keyword=${keyword}`);
-
-  for (let page = 1; page <= maxPage; page++) {
-    setStatus(rakutenStatus, `楽天API取得中… ${page}/${maxPage}`);
-    const items = await fetchRakutenPage(keyword, page, hits, appId, accessKey, affiliateId);
-
-    items.forEach((item) => {
-      rakutenRows.push({
-        shop: item.shopName || "",
-        name: item.itemName || "",
-        model: extractModelCode(item.itemName || ""),
-        url: item.itemUrl || "",
-        price: sanitizeNumber(item.itemPrice),
-      });
-    });
-
-    await new Promise((r) => setTimeout(r, 1200));
-  }
-
-  setStatus(rakutenStatus, `楽天検索結果: ${rakutenRows.length}件`);
-  log(`楽天API完了 total=${rakutenRows.length}`);
-
-  updateButtons();
+  return dp[a.length][b.length];
 }
 
 // =========================================================
-// 楽天 × Keepa 照合
+// 型番曖昧照合
 // =========================================================
-function matchRakutenRow(row) {
-  const model = (row.model || "").trim();
-  if (!model) return null;
+function matchKeepaModel(name, keepaList) {
+  const cleanName = name.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
 
-  const candidates = keepaByPart.get(model);
-  if (candidates && candidates.length) {
-    let best = null;
-    candidates.forEach((c) => {
-      const info = getKeepaPriceInfo(c);
-      if (!info) return;
-      if (!best || info.netPerUnit > best.info.netPerUnit) {
-        best = { keepaRow: c, info };
-      }
-    });
-    return best;
+  for (const k of keepaList) {
+    const pn = k.partNumber;
+    const pnClean = pn.replace(/[^A-Za-z0-9]/g, "");
+
+    if (name.toUpperCase().includes(pn)) return k;
+    if (cleanName.includes(pnClean)) return k;
+    if (levenshtein(cleanName, pnClean) <= 2) return k;
   }
 
   return null;
 }
 
-function runMatching() {
-  if (!rakutenRows.length) {
-    alert("楽天検索結果がありません");
-    return;
+// =========================================================
+// 楽天 × Keepa 照合
+// =========================================================
+function filterByKeepa(items, keepaList) {
+  return items.map(item => {
+    const matched = matchKeepaModel(item.name, keepaList);
+    if (!matched) return null;
+
+    const price = matched.price;
+    const income =
+      price - matched.fbaFee - (price * matched.rate);
+
+    return {
+      ...item,
+      model: matched.partNumber,
+      asin: matched.asin,
+      amazonUrl: `https://www.amazon.co.jp/dp/${matched.asin}`,
+      keepaPrice: price,
+      incomePerUnit: Math.round(income)
+    };
+  }).filter(Boolean);
+}
+
+// =========================================================
+// テーブル描画
+// =========================================================
+function renderTable(items) {
+  tbodyEl.innerHTML = "";
+
+  for (const item of items) {
+    const tr = document.createElement("tr");
+
+    tr.innerHTML = `
+      <td>${item.shop}</td>
+      <td>${item.name}</td>
+      <td>${item.model}</td>
+      <td><a href="${item.url}" target="_blank">楽天</a></td>
+      <td>${item.price}</td>
+
+      <td>${item.asin}</td>
+      <td><a href="${item.amazonUrl}" target="_blank">Amazon</a></td>
+      <td>${item.keepaPrice}</td>
+      <td>${item.incomePerUnit}</td>
+    `;
+
+    tbodyEl.appendChild(tr);
   }
-  if (!keepaRows.length) {
-    alert("Keepa CSVが読み込まれていません");
+}
+
+// =========================================================
+// Excel 出力
+// =========================================================
+function exportToExcel() {
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.table_to_sheet(document.getElementById("result-table"));
+  XLSX.utils.book_append_sheet(wb, ws, "RAKUTEN_KEEPA");
+  XLSX.writeFile(wb, "rakuten_keepa.xlsx");
+}
+
+// =========================================================
+// メイン処理
+// =========================================================
+document.getElementById("start").addEventListener("click", async () => {
+  const keyword = document.getElementById("keyword").value.trim();
+  if (!keyword) {
+    alert("検索ワードを入力してください");
     return;
   }
 
-  resultRows = [];
+  statusEl.textContent = `${keyword} の楽天検索を開始します…`;
 
-  rakutenRows.forEach((r) => {
-    const match = matchRakutenRow(r);
-    if (!match) {
-      resultRows.push({
-        shop: r.shop,
-        name: r.name,
-        model: r.model,
-        rakutenUrl: r.url,
-        unitPrice: r.price,
-        asin: "",
-        amazonUrl: "",
-        listingPrice: NaN,
-        netPerUnit: NaN,
-      });
-      return;
+  const allItems = [];
+
+  for (let page = 1; page <= 110; page++) {
+    statusEl.textContent = `楽天API取得中… ページ ${page} / 110`;
+
+    const items = await fetchRakutenPage(keyword, page);
+    if (items) {
+      const parsed = parseItems(items);
+      allItems.push(...parsed);
     }
 
-    const info = match.info;
-    const asin = info.asin;
-    const amazonUrl = asin ? `https://www.amazon.co.jp/dp/${asin}` : "";
+    await sleep(1400);
+  }
 
-    resultRows.push({
-      shop: r.shop,
-      name: r.name,
-      model: info.part,
-      rakutenUrl: r.url,
-      unitPrice: r.price,
-      asin,
-      amazonUrl,
-      listingPrice: info.listingPrice,
-      netPerUnit: info.netPerUnit,
-    });
-  });
+  statusEl.textContent = `楽天取得完了。${allItems.length}件。Keepa CSV を読み込みます…`;
 
-  renderResultTable();
-  const hit = resultRows.filter((r) => r.asin).length;
-  setStatus(matchSummary, `型番一致: ${hit}件`);
-  setStatus(matchStatus, "照合完了");
-  log(`照合完了 hit=${hit}`);
-
-  updateButtons();
-}
-
-// =========================================================
-// 結果テーブル描画
-// =========================================================
-function renderResultTable() {
-  resultTableBody.innerHTML = "";
-
-  resultRows.forEach((r) => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${r.shop}</td>
-      <td>${r.name}</td>
-      <td>${r.model}</td>
-      <td><a href="${r.rakutenUrl}" target="_blank">楽天</a></td>
-      <td>${isNaN(r.unitPrice) ? "" : Math.round(r.unitPrice)}</td>
-      <td>${r.asin}</td>
-      <td>${r.amazonUrl ? `<a href="${r.amazonUrl}" target="_blank">Amazon</a>` : ""}</td>
-      <td>${isNaN(r.listingPrice) ? "" : Math.round(r.listingPrice)}</td>
-      <td>${isNaN(r.netPerUnit) ? "" : Math.round(r.netPerUnit)}</td>
-    `;
-    resultTableBody.appendChild(tr);
-  });
-}
-
-// =========================================================
-// ExcelテンプレCSV出力
-// =========================================================
-function exportExcelTemplateCsv() {
-  if (!resultRows.length) {
-    alert("照合結果がありません");
+  const keepaList = await loadKeepaCsvFromLocal();
+  if (!keepaList) {
+    alert("Keepa CSV を選択してください");
     return;
   }
 
-  const header = [
-    "購入年月日","購入先","商品名","商品名(型番)","URL","単価","個数","価格","値引","送料","請求額",
-    "火・木 プレミアムカードデー","5の日","ワンダフル","18日","イーグルス等","ママ割","マイカー割","リピート","直前","39ショップ","店舗",
-    "基本還元率","楽天モバイル＋会員ランク特典","楽天カード通常分","楽天カード特典分","楽天銀行＋楽天カード（引落）",
-    "マラソン①","マラソン②","マラソン③","ポイントアップ祭り","イーグルス他","39ショップ(ポイント)","火・木 プレミアムカードデー(ポイント)",
-    "5の日(ポイント)","ワンダフル(ポイント)","18日(ポイント)","店舗(ポイント)","合計ポイント","実質購入金額","実質購入単価",
-    "ASIN","Amazon等販売先URL","出品価格","入金予定[円/個]","予定利益/個","予定総利益","SKU例"
-  ];
+  const matchedItems = filterByKeepa(allItems, keepaList);
 
-  const rows = [];
+  statusEl.textContent = `型番一致 ${matchedItems.length}件。Excel 出力可能です。`;
 
-  resultRows.forEach((r, idx) => {
-    const qty = 1;
-    const price = isNaN(r.unitPrice) ? 0 : Math.round(r.unitPrice);
-    const total = price * qty;
-    const billed = total;
-
-    const net = isNaN(r.netPerUnit) ? 0 : Math.round(r.netPerUnit);
-    const profitPer = net - price;
-    const profitTotal = profitPer * qty;
-    const sku = `20260819_${idx}-0`;
-
-    rows.push([
-      "",
-      r.shop,
-      r.name,
-      r.model,
-      r.rakutenUrl,
-      price,
-      qty,
-      total,
-      0,
-      0,
-      billed,
-      "", "", "", "", "", "", "", "", "", "", "",
-      "", "", "", "", "",
-      "", "", "", "", "", "", "", "", "", "", "", "", "",
-      r.asin,
-      r.amazonUrl,
-      isNaN(r.listingPrice) ? "" : Math.round(r.listingPrice),
-      isNaN(r.netPerUnit) ? "" : Math.round(r.netPerUnit),
-      profitPer,
-      profitTotal,
-      sku
-    ]);
-  });
-
-  const csv = Papa.unparse([header, ...rows]);
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "楽天ポイント集計用_照合結果.csv";
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-
-  URL.revokeObjectURL(url);
-  log("ExcelテンプレCSV出力完了");
-}
-
-// =========================================================
-// RAW CSV出力
-// =========================================================
-function exportRawCsv() {
-  if (!resultRows.length) {
-    alert("照合結果がありません");
-    return;
-  }
-
-  const header = [
-    "購入先（ショップ名）","商品名","商品名（型番）","楽天URL","単価",
-    "ASIN","Amazon等販売先URL","出品価格","入金予定[円/個]"
-  ];
-
-  const rows = resultRows.map((r) => [
-    r.shop,
-    r.name,
-    r.model,
-    r.rakutenUrl,
-    isNaN(r.unitPrice) ? "" : Math.round(r.unitPrice),
-    r.asin,
-    r.amazonUrl,
-    isNaN(r.listingPrice) ? "" : Math.round(r.listingPrice),
-    isNaN(r.netPerUnit) ? "" : Math.round(r.netPerUnit)
-  ]);
-
-  const csv = Papa.unparse([header, ...rows]);
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "照合結果_raw.csv";
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-
-  URL.revokeObjectURL(url);
-  log("RAW CSV出力完了");
-}
-
-// =========================================================
-// ボタン制御
-// =========================================================
-function updateButtons() {
-  const ready = rakutenRows.length > 0 && keepaRows.length > 0;
-  runMatchBtn.disabled = !ready;
-  exportExcelBtn.disabled = resultRows.length === 0;
-  exportRawCsvBtn.disabled = resultRows.length === 0;
-}
-
-// =========================================================
-// イベント
-// =========================================================
-runRakutenApiBtn.addEventListener("click", runRakutenApi);
-
-keepaCsvInput.addEventListener("change", async (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
-  setStatus(keepaStatus, "Keepa CSV読込中…");
-  try {
-    await loadKeepaCsv(file);
-    setStatus(keepaStatus, `Keepa CSV読込完了（${keepaRows.length}件）`);
-    log(`Keepa CSV読込完了 rows=${keepaRows.length}`);
-  } catch (err) {
-    setStatus(keepaStatus, "Keepa CSV読込エラー");
-    log("Keepa CSV読込エラー");
-  }
-  updateButtons();
+  renderTable(matchedItems);
 });
 
-clearKeepaBtn.addEventListener("click", () => {
-  keepaRows = [];
-  keepaHeader = [];
-  keepaByPart.clear();
-  setStatus(keepaStatus, "Keepa CSV: 未読込");
-  log("Keepa CSVクリア");
-  updateButtons();
+document.getElementById("export").addEventListener("click", () => {
+  exportToExcel();
 });
-
-runMatchBtn.add
