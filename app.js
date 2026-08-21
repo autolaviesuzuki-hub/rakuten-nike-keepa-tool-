@@ -1,5 +1,5 @@
 // =========================================================
-// app.js（最終同期版）
+// app.js（最終完全版）
 // =========================================================
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -246,7 +246,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // =========================================================
-  // CSV出力
+  // RAW CSV出力
   // =========================================================
   function exportRawCsv() {
     const header = [
@@ -273,10 +273,52 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // =========================================================
-  // ExcelテンプレートCSV出力（簡易版）
+  // Excelテンプレート出力（数式行コピー対応）
   // =========================================================
-  function exportExcelTemplateCsv() {
-    exportRawCsv(); // 必要ならテンプレート版に差し替え可能
+  async function exportExcelTemplate() {
+
+    // ① テンプレート読込
+    const templateBuffer = await fetch("rakuten_template.xlsx").then(r => r.arrayBuffer());
+    const wb = XLSX.read(templateBuffer, { type: "array" });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+
+    // ② 12行目の数式セルを取得
+    const formulaRow = 12;
+
+    // ③ 書き込み開始行
+    let row = 13;
+
+    for (const r of resultRows) {
+
+      // --- 数式行コピー（12行目 → row） ---
+      const range = XLSX.utils.decode_range(ws["!ref"]);
+      for (let C = range.s.c; C <= range.e.c; C++) {
+        const col = XLSX.utils.encode_col(C);
+        const srcCell = ws[`${col}${formulaRow}`];
+        if (srcCell && srcCell.f) {
+          ws[`${col}${row}`] = { f: srcCell.f };
+        }
+      }
+
+      // --- 楽天側（B〜F列） ---
+      ws[`B${row}`] = { v: r.shop };
+      ws[`C${row}`] = { v: r.name };
+      ws[`D${row}`] = { v: r.model };
+      ws[`E${row}`] = { v: r.rakutenUrl };
+      ws[`F${row}`] = { v: r.unitPrice };
+
+      // --- Amazon側（CK〜CN列） ---
+      ws[`CK${row}`] = { v: r.asin };
+      ws[`CL${row}`] = { v: r.amazonUrl };
+      ws[`CM${row}`] = { v: r.listingPrice };
+      ws[`CN${row}`] = { v: r.netPerUnit };
+
+      row++;
+    }
+
+    // ④ Excel保存
+    XLSX.writeFile(wb, "楽天ポイント集計_自動出力.xlsx");
+    log("Excelテンプレート出力完了");
   }
 
   // =========================================================
@@ -300,7 +342,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   runMatchBtn.addEventListener("click", runMatching);
-  exportExcelBtn.addEventListener("click", exportExcelTemplateCsv);
+  exportExcelBtn.addEventListener("click", exportExcelTemplate);
   exportRawCsvBtn.addEventListener("click", exportRawCsv);
 
 });
