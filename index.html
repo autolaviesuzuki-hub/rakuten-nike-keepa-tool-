@@ -1,300 +1,80 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <title>楽天 × Keepa 照合ツール（楽天API自動取得版）</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <!-- PapaParse -->
-  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-  <!-- axios（楽天API用） -->
-  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-  <style>
-    body {
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      margin: 0;
-      padding: 0;
-      background: #f5f7fb;
-      color: #222;
-    }
-    header {
-      background: #1b4f9c;
-      color: #fff;
-      padding: 12px 20px;
-    }
-    header h1 {
-      margin: 0;
-      font-size: 20px;
-    }
-    header p {
-      margin: 4px 0 0;
-      font-size: 12px;
-      opacity: 0.85;
-    }
-    main {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 16px;
-    }
-    section {
-      background: #fff;
-      border-radius: 8px;
-      padding: 12px 16px;
-      margin-bottom: 12px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-    }
-    h2 {
-      font-size: 16px;
-      margin: 0 0 8px;
-      border-left: 4px solid #1b4f9c;
-      padding-left: 8px;
-    }
-    h3 {
-      font-size: 14px;
-      margin: 8px 0;
-    }
-    label {
-      font-size: 13px;
-      display: inline-block;
-      margin-bottom: 4px;
-    }
-    input[type="text"],
-    input[type="number"] {
-      width: 100%;
-      box-sizing: border-box;
-      padding: 6px 8px;
-      border-radius: 4px;
-      border: 1px solid #ccd2e3;
-      font-size: 13px;
-    }
-    input[type="file"] {
-      font-size: 13px;
-    }
-    button {
-      border: none;
-      border-radius: 4px;
-      padding: 6px 12px;
-      font-size: 13px;
-      cursor: pointer;
-      margin-right: 6px;
-    }
-    button.primary {
-      background: #1b4f9c;
-      color: #fff;
-    }
-    button.secondary {
-      background: #e3e7f5;
-      color: #1b4f9c;
-    }
-    button.danger {
-      background: #e35b5b;
-      color: #fff;
-    }
-    button:disabled {
-      opacity: 0.5;
-      cursor: default;
-    }
-    .row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      margin-bottom: 8px;
-    }
-    .col-3 { flex: 0 0 25%; min-width: 220px; }
-    .col-4 { flex: 0 0 33%; min-width: 260px; }
-    .col-6 { flex: 0 0 50%; min-width: 320px; }
-    .col-12 { flex: 0 0 100%; }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 12px;
-    }
-    th, td {
-      border: 1px solid #dde2f2;
-      padding: 4px 6px;
-      text-align: left;
-      vertical-align: top;
-    }
-    th {
-      background: #f0f3ff;
-      font-weight: 600;
-    }
-    #matchStatus {
-      font-size: 13px;
-      margin-top: 4px;
-      color: #1b4f9c;
-    }
-    #logArea {
-      width: 100%;
-      height: 140px;
-      box-sizing: border-box;
-      border-radius: 4px;
-      border: 1px solid #ccd2e3;
-      padding: 6px;
-      font-size: 12px;
-      font-family: "SF Mono", Menlo, Consolas, monospace;
-      white-space: pre-wrap;
-      overflow-y: auto;
-      background: #fafbff;
-    }
-    .badge {
-      display: inline-block;
-      padding: 2px 6px;
-      border-radius: 999px;
-      font-size: 11px;
-      background: #e3e7f5;
-      color: #1b4f9c;
-      margin-left: 4px;
-    }
-  </style>
+<meta charset="UTF-8">
+<title>楽天 × Keepa 照合ツール</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
 </head>
+
 <body>
-  <header>
-    <h1>楽天 × Keepa 照合ツール（楽天API自動取得版）</h1>
-    <p>楽天APIで検索結果を自動取得し、Keepa CSVと照合して、Excelテンプレート形式で出力します。</p>
-  </header>
 
-  <main>
-    <!-- 楽天API設定 -->
-    <section>
-  <h2>楽天API設定</h2>
-  <div class="row">
-    <div class="col-4">
-      <label for="rakutenAppId">楽天アプリID（Application ID）</label>
-      <input type="text" id="rakutenAppId" value="a38ecc5b-5a90-4eb9-b4f8-e714ba84eefd" placeholder="例: 1234567890abcdef1234567890abcdef"/>
-    </div>
+<h2>楽天API設定</h2>
 
-    <div class="col-4">
-      <label for="rakutenAccessKey">楽天AccessKey</label>
-      <input type="text" id="rakutenAccessKey" value="pk_oRPj9UEOAjvjnUtRwKwaje85mgY98Nzo7rzvGf7sQRj" placeholder="例: pk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxx" />
-    </div>
+アプリID:  
+<input id="rakutenAppId" value="a38ecc5b-5a90-4eb9-b4f8-e714ba84eefd"><br>
 
-    <div class="col-4">
-      <label for="rakutenAffiliateId">楽天アフィリエイトID（任意）</label>
-      <input type="text" id="rakutenAffiliateId" value="508e3cc0.8bca5b62.508e3cc1.e4f6afac" placeholder="例: 12345678.abcdef12.12345678.abcdef12" />
-    </div>
-  </div>
+AccessKey:  
+<input id="rakutenAccessKey" value="pk_oRPj9UEOAjvjnUtRwKwaje85mgY98Nzo7rzvGf7sQRj"><br>
 
-  <div class="row">
-    <div class="col-4">
-      <label for="rakutenHits">1ページあたりの件数（hits）</label>
-      <input type="number" id="rakutenHits" value="30" min="1" max="30" />
-    </div>
-    <div class="col-4">
-      <label for="rakutenMaxPage">最大ページ数</label>
-      <input type="number" id="rakutenMaxPage" value="100" min="1" max="100" />
-    </div>
-    <div class="col-4">
-      <label for="searchKeywordInput">検索キーワード</label>
-      <input type="text" id="searchKeywordInput" placeholder="例: ナイキ シューズ" />
-    </div>
-  </div>
+1ページあたり件数（hits）  
+<input id="rakutenHits" value="30"><br>
 
-  <div class="row">
-    <div class="col-4">
-      <label>&nbsp;</label><br />
-      <button id="runRakutenApiBtn" class="primary">楽天APIで検索実行</button>
-    </div>
-  </div>
+最大ページ数  
+<input id="rakutenMaxPage" value="100"><br>
 
-  <p style="font-size:12px; color:#555;">
-    楽天APIで <strong>hits × maxPage</strong> 件（例: 30 × 100 = 3000件）を取得し、内部で「楽天CSV」として保持します。
-  </p>
-</section>
+検索キーワード  
+<input id="searchKeywordInput" value="ナイキ シューズ"><br><br>
 
-    <!-- Keepa CSV入力 -->
-    <section>
-      <h2>Keepa CSV入力</h2>
-      <div class="row">
-        <div class="col-6">
-          <label for="keepaCsvInput">Keepa CSV（ASIN・PartNumber・価格・手数料）</label><br />
-          <input type="file" id="keepaCsvInput" accept=".csv" />
-          <button id="clearKeepaBtn" class="secondary">Keepa CSVクリア</button>
-          <div id="keepaStatus" style="font-size:12px; margin-top:4px;">Keepa CSV: 未読込</div>
-        </div>
-        <div class="col-6">
-          <label>楽天検索結果（内部状態）<span class="badge">楽天APIから自動取得</span></label>
-          <div id="rakutenStatus" style="font-size:12px; margin-top:4px;">楽天検索結果: 未取得</div>
-        </div>
-      </div>
-    </section>
+<button id="runRakutenApiBtn">楽天APIで検索実行</button>
 
-    <!-- 照合・結果表示 -->
-    <section>
-      <h2>楽天 × Keepa 照合</h2>
-      <div class="row">
-        <div class="col-6">
-          <button id="runMatchBtn" class="primary" disabled>楽天 × Keepa 照合開始</button>
-          <span id="matchStatus">照合待ち: 楽天検索結果とKeepa CSVを読み込んでください。</span>
-        </div>
-        <div class="col-6" style="text-align:right;">
-          <button id="toggleRawBtn" class="secondary">生データ表示切替</button>
-        </div>
-      </div>
+<hr>
 
-      <h3>照合結果（型番一致一覧）</h3>
-      <p style="font-size:12px; color:#555;">
-        楽天側「商品名」から型番を抽出し、Keepaの PartNumber と照合した結果を表示します。ASIN・出品価格・入金予定[円/個] を含みます。
-      </p>
-      <div id="matchSummary" style="font-size:12px; margin-bottom:4px;">型番一致: 0件</div>
+<h2>Keepa CSV入力</h2>
+<input type="file" id="keepaCsvInput">
+<button id="clearKeepaBtn">Keepa CSVクリア</button>
 
-      <table id="resultTable">
-        <thead>
-          <tr>
-            <th>購入先（ショップ名）</th>
-            <th>商品名</th>
-            <th>商品名（型番）</th>
-            <th>楽天URL</th>
-            <th>単価</th>
-            <th>ASIN</th>
-            <th>Amazon等販売先URL</th>
-            <th>出品価格</th>
-            <th>入金予定[円/個]</th>
-          </tr>
-        </thead>
-        <tbody>
-          <!-- app.js で動的に行を追加 -->
-        </tbody>
-      </table>
-    </section>
+<div id="keepaStatus"></div>
 
-    <!-- Excel出力 -->
-    <section>
-      <h2>Excelテンプレート出力</h2>
-      <p style="font-size:12px; color:#555;">
-        「楽天ポイント集計Excel」テンプレート形式で CSV を生成します。12行目以降に検索結果を流し込み、テンプレートの数式列はそのまま維持される構造で出力します。
-      </p>
-      <div class="row">
-        <div class="col-6">
-          <button id="exportExcelBtn" class="primary" disabled>ExcelテンプレートCSVをダウンロード</button>
-        </div>
-        <div class="col-6">
-          <button id="exportRawCsvBtn" class="secondary" disabled>結果のみCSVダウンロード</button>
-        </div>
-      </div>
-      <div id="excelStatus" style="font-size:12px; margin-top:4px;">Excel出力: 型番一致結果が生成されると有効になります。</div>
-    </section>
+<hr>
 
-    <!-- ログ -->
-    <section>
-      <h2>ログ / メッセージ</h2>
-      <p style="font-size:12px; color:#555;">
-        処理の進行状況・エラー・抽出された型番などをテキストログとして確認できます。
-      </p>
-      <textarea id="logArea" readonly></textarea>
-    </section>
+<h2>楽天 × Keepa 照合</h2>
+<button id="runMatchBtn">照合開始</button>
 
-    <section>
-      <h2>ヘルプ</h2>
-      <p style="font-size:12px; color:#555; line-height:1.6;">
-        1. 楽天API設定に「アプリID」と検索キーワードを入力し、「楽天APIで検索実行」を押します。<br />
-        2. Keepa CSV（ASIN・PartNumber・価格・手数料）を読み込みます。<br />
-        3. 「楽天 × Keepa 照合開始」を押すと、型番抽出 → PartNumber照合 → ASIN・価格・入金予定[円/個] を計算します。<br />
-        4. 「ExcelテンプレートCSVをダウンロード」で、楽天ポイント集計Excel用のCSVを出力できます。<br />
-      </p>
-    </section>
-  </main>
+<div id="matchStatus"></div>
+<div id="matchSummary"></div>
 
-  <script src="config.js"></script>
-  <script src="app.js"></script>
+<hr>
+
+<h2>照合結果</h2>
+
+<table id="resultTable" border="1">
+<thead>
+<tr>
+  <th>ショップ</th>
+  <th>商品名</th>
+  <th>型番</th>
+  <th>楽天URL</th>
+  <th>単価</th>
+  <th>ASIN</th>
+  <th>AmazonURL</th>
+  <th>出品価格</th>
+  <th>入金予定</th>
+</tr>
+</thead>
+<tbody></tbody>
+</table>
+
+<hr>
+
+<button id="exportExcelBtn">ExcelテンプレートCSV出力</button>
+<button id="exportRawCsvBtn">結果のみCSV出力</button>
+
+<hr>
+
+<h2>ログ</h2>
+<textarea id="logArea" rows="20" cols="120"></textarea>
+
+<script src="app.js"></script>
 </body>
 </html>
