@@ -278,7 +278,7 @@ document.addEventListener("DOMContentLoaded", () => {
   async function exportExcelTemplate() {
 
     // ① テンプレート読込
-    const templateBuffer = await fetch("rakuten_template.xlsx").then(r => r.arrayBuffer());
+    const templateBuffer = await fetch("rakutenPointTemplate.xlsx").then(r => r.arrayBuffer());
     const wb = XLSX.read(templateBuffer, { type: "array" });
     const ws = wb.Sheets[wb.SheetNames[0]];
 
